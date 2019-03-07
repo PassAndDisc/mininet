@@ -1189,10 +1189,12 @@ class OVSSwitch( Switch ):
                 'OVS kernel switch does not work in a namespace' )
         int( self.dpid, 16 )  # DPID must be a hex string
         # Command to add interfaces
-        intfs = ''.join( ' -- add-port %s %s' % ( self, intf ) +
+        iflist = self.intfList()
+        intfs = [''.join( ' -- add-port %s %s' % ( self, intf ) +
                          self.intfOpts( intf )
-                         for intf in self.intfList()
+                         for intf in iflist[ 500*i: 500*(i+1) ]
                          if self.ports[ intf ] and not intf.IP() )
+        				 for i in range( 1 + len( iflist ) // 500 ) ]
         # Command to create controller entries
         clist = [ ( self.name + c.name, '%s:%s:%d' %
                   ( c.protocol, c.IP(), c.port ) )
@@ -1210,20 +1212,18 @@ class OVSSwitch( Switch ):
         # Try to delete any existing bridges with the same name
         if not self.isOldOVS():
             cargs += ' -- --if-exists del-br %s' % self
-        # One ovs-vsctl command to rule them all!
+        # One ovs-vsctl command to rule them all! NOPE
         self.vsctl( cargs +
                     ' -- add-br %s' % self +
                     ' -- set bridge %s controller=[%s]' % ( self, cids  ) +
-                    self.bridgeOpts() +
-                    intfs )
+                    self.bridgeOpts())
+        for i in range( 1 + len( iflist ) // 500 ):
+        	print intfs[i]
+        	self.vsctl( intfs[i] )
         # If necessary, restore TC config overwritten by OVS
         if not self.batch:
             for intf in self.intfList():
                 self.TCReapply( intf )
-
-    # This should be ~ int( quietRun( 'getconf ARG_MAX' ) ),
-    # but the real limit seems to be much lower
-    argmax = 128000
 
     @classmethod
     def batchStartup( cls, switches, run=errRun ):
